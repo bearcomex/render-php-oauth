@@ -1,11 +1,13 @@
 <?php
 // App credentials
 $client_id = '6dff28e9-1e23-4b52-ad14-b1f2b4ed3525';
-$tenant_id = 'ecc697bd-ebb8-4055-8d5d-804f28f5cbe0';
 $redirect_uri = 'https://render-php-oauth.onrender.com/callback.php';
 
 // Use environment variable for secret (never hardcode in public repo)
 $client_secret = getenv('CLIENT_SECRET');
+
+// Multi-tenant token endpoint
+$token_url = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 
 if (isset($_GET['code'])) {
     $code = $_GET['code'];
@@ -29,7 +31,6 @@ if (isset($_GET['code'])) {
     ];
 
     $context = stream_context_create($options);
-    $token_url = "https://login.microsoftonline.com/$tenant_id/oauth2/v2.0/token";
 
     $result = @file_get_contents($token_url, false, $context);
 
@@ -42,7 +43,7 @@ if (isset($_GET['code'])) {
         print_r($error_headers);
         echo "</pre>";
 
-        // Show body if available
+        // Attempt to show body for detailed error message
         $stream = fopen($token_url, 'r', false, $context);
         if ($stream) {
             $body = stream_get_contents($stream);
@@ -57,6 +58,7 @@ if (isset($_GET['code'])) {
         print_r($token_response);
         echo "</pre>";
     }
+
 } else {
     echo "No authorization code received.";
 }
