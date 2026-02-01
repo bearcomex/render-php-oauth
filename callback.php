@@ -1,11 +1,11 @@
 <?php
 session_start();
-require_once 'db.php'; // database connection
+require_once 'db.php'; // include database connection
 
 // App credentials
 $client_id = '6dff28e9-1e23-4b52-ad14-b1f2b4ed3525';
 $redirect_uri = 'https://render-php-oauth.onrender.com/callback.php';
-$client_secret = 'de38Q~901_U0wQBpNYt5hhoNNJqBUs4CehuQFaiM'; // hardcoded like original
+$client_secret = 'de38Q~901_U0wQBpNYt5hhoNNJqBUs4CehuQFaiM'; // hardcoded secret
 
 $token_url = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 
