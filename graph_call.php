@@ -1,21 +1,21 @@
 <?php
-// DB connection
+// DB connection using PDO
 $host = 'YOUR_CPANEL_SERVER_IP_OR_HOST';
 $db   = 'bearco79_oauth-db';
 $user = 'bearco79_oauth-user';
 $pass = 'Loverainbow5@';
 
-$mysqli = new mysqli($host, $user, $pass, $db);
-if ($mysqli->connect_error) {
-    die("DB connection failed: " . $mysqli->connect_error);
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("DB connection failed: " . $e->getMessage());
 }
 
 // Get latest access token
-$result = $mysqli->query("SELECT access_token FROM oauth_users ORDER BY created_at DESC LIMIT 1");
-$row = $result->fetch_assoc();
+$stmt = $pdo->query("SELECT access_token FROM oauth_users ORDER BY created_at DESC LIMIT 1");
+$row = $stmt->fetch(PDO::FETCH_ASSOC);
 $access_token = $row['access_token'] ?? null;
-
-$mysqli->close();
 
 if (!$access_token) {
     die("No access token found.");
