@@ -1,14 +1,12 @@
-# Use official PHP image
-FROM php:8.1-cli
+FROM php:8.2-apache
 
-# Set working directory
-WORKDIR /app
+# Install Postgres PDO driver
+RUN apt-get update && apt-get install -y libpq-dev && docker-php-ext-install pdo_pgsql
 
-# Copy all files into container
-COPY . /app
+# Copy app files
+COPY . /var/www/html/
 
-# Expose port for Render
-EXPOSE 10000
+# Enable Apache rewrite module
+RUN a2enmod rewrite
 
-# Run PHP built-in server
-CMD ["php", "-S", "0.0.0.0:10000", "-t", "."]
+EXPOSE 80
