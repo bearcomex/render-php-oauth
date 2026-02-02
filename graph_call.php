@@ -1,43 +1,46 @@
 <?php
-// DB connection using PDO
-$host = 'YOUR_CPANEL_SERVER_IP_OR_HOST';
-$db   = 'bearco79_oauth-db';
-$user = 'bearco79_oauth-user';
-$pass = 'Loverainbow5@';
+// --- CONFIG ---
+$token_file = __DIR__ . '/tokens.json';
+$graph_url = 'https://graph.microsoft.com/v1.0/me';
 
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    die("DB connection failed: " . $e->getMessage());
+// --- Get latest token ---
+if (!file_exists($token_file)) {
+    die("No tokens found.");
 }
 
-// Get latest access token
-$stmt = $pdo->query("SELECT access_token FROM oauth_users ORDER BY created_at DESC LIMIT 1");
-$row = $stmt->fetch(PDO::FETCH_ASSOC);
-$access_token = $row['access_token'] ?? null;
+$all_tokens = json_decode(file_get_contents($token_file), true);
+if (!$all_tokens) {
+    die("Token file empty or invalid.");
+}
 
+// Get the most recent token
+$latest_token = end($all_tokens);
+$access_token = $latest_token['access_token'] ?? null;
 if (!$access_token) {
-    die("No access token found.");
+    die("No access token available.");
 }
 
-// Call Microsoft Graph (example: /me endpoint)
-$graph_url = "https://graph.microsoft.com/v1.0/me";
-$options = [
+// --- Call Microsoft Graph ---
+$opts = [
     "http" => [
-        "header" => "Authorization: Bearer $access_token\r\n",
-        "method" => "GET"
+        "method" => "GET",
+        "header" => "Authorization: Bearer $access_token\r\n" .
+                    "Accept: application/json\r\n"
     ]
 ];
 
-$context = stream_context_create($options);
-$response = file_get_contents($graph_url, false, $context);
+$context = stream_context_create($opts);
+$response = @file_get_contents($graph_url, false, $context);
 
 if ($response === false) {
-    echo "Graph API request failed.";
-} else {
-    $data = json_decode($response, true);
-    echo "<pre>";
-    print_r($data);
-    echo "</pre>";
+    echo "Graph API call failed.";
+    exit;
 }
+
+// Decode response
+$data = json_decode($response, true);
+
+// Display in browser (or log somewhere secure)
+echo "<pre>";
+print_r($data);
+echo "</pre>";
