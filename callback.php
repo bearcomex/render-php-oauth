@@ -1,17 +1,16 @@
 <?php
 session_start();
-require_once 'db.php'; // Must be the Render-ready db.php
+require_once 'db.php'; // Render-ready db.php
 
 // Azure App credentials
 $client_id = '6dff28e9-1e23-4b52-ad14-b1f2b4ed3525';
 $client_secret = 'de38Q~901_U0wQBpNYt5hhoNNJqBUs4CehuQFaiM';
-$tenant_id = 'ecc697bd-ebb8-4055-8d5d-804f28f5cbe0';
 $redirect_uri = 'https://render-php-oauth.onrender.com/callback.php';
 
-// Token endpoint
-$token_url = "https://login.microsoftonline.com/$tenant_id/oauth2/v2.0/token";
+// Use common endpoint to match your working login link
+$token_url = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 
-// Check if auth code is present
+// Check if authorization code is present
 if (!isset($_GET['code'])) {
     die("No authorization code received.");
 }
@@ -28,7 +27,7 @@ $postData = http_build_query([
     'client_secret' => $client_secret
 ]);
 
-// cURL request to get tokens
+// Use cURL to request tokens
 $ch = curl_init($token_url);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
