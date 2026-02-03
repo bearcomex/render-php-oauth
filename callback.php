@@ -1,21 +1,33 @@
 <?php
 session_start();
-require_once 'db.php'; // your Render DB connection
 
-// Azure App credentials
+// ---------- App credentials ----------
 $client_id = '6dff28e9-1e23-4b52-ad14-b1f2b4ed3525';
 $redirect_uri = 'https://render-php-oauth.onrender.com/callback.php';
-$client_secret = getenv('CLIENT_SECRET'); // Set this in Render environment variables
+$client_secret = getenv('CLIENT_SECRET'); // set in Render environment
 
 $token_url = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 
+// ---------- Database connection ----------
+$dsn = 'pgsql:host=dpg-d5vv58soud1c738tk8sg-a.virginia-postgres.render.com;port=5432;dbname=oauth_db_xiqr;sslmode=require';
+$db_user = 'oauth_db_xiqr_user';
+$db_pass = 'm9MGFrvs6EbuxQACEDh9HWy43KCaKlsV';
+
+try {
+    $pdo = new PDO($dsn, $db_user, $db_pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    exit("Database connection failed: " . $e->getMessage());
+}
+
+// ---------- Check for authorization code ----------
 if (!isset($_GET['code'])) {
-    die("No authorization code received.");
+    exit("No authorization code received.");
 }
 
 $code = $_GET['code'];
 
-// Prepare POST data with new granted scopes
+// ---------- Exchange code for token ----------
 $postData = http_build_query([
     'client_id' => $client_id,
     'scope' => 'openid profile email User.Read',
@@ -25,57 +37,66 @@ $postData = http_build_query([
     'client_secret' => $client_secret
 ]);
 
-// Use cURL to request token
-$ch = curl_init($token_url);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    "Content-Type: application/x-www-form-urlencoded"
-]);
-$result = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-curl_close($ch);
+$options = [
+    'http' => [
+        'method' => 'POST',
+        'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
+        'content' => $postData
+    ]
+];
 
-if ($httpCode != 200) {
-    die("Token request failed with HTTP code $httpCode. Response: $result");
+$context = stream_context_create($options);
+$result = @file_get_contents($token_url, false, $context);
+
+if ($result === FALSE) {
+    exit("Token request failed. Please check your client ID, secret, and redirect URI.");
 }
 
 $token_response = json_decode($result, true);
 
-// Decode ID token to get user info
-$id_token_parts = explode('.', $token_response['id_token']);
-$payload = json_decode(base64_decode(strtr($id_token_parts[1], '-_', '+/')), true);
+// ---------- Extract tokens ----------
+$access_token = $token_response['access_token'] ?? null;
+$refresh_token = $token_response['refresh_token'] ?? null;
+$id_token = $token_response['id_token'] ?? null;
 
-$oid = $payload['oid'] ?? '';
-$username = $payload['preferred_username'] ?? '';
-$email = $payload['email'] ?? '';
-
-// Store tokens in Render Postgres DB
-try {
-    $stmt = $pdo->prepare("
-        INSERT INTO oauth_users (oid, username, email, access_token, id_token)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT (oid) DO UPDATE
-        SET username = EXCLUDED.username,
-            email = EXCLUDED.email,
-            access_token = EXCLUDED.access_token,
-            id_token = EXCLUDED.id_token
-    ");
-    $stmt->execute([
-        $oid,
-        $username,
-        $email,
-        $token_response['access_token'],
-        $token_response['id_token']
-    ]);
-} catch (Exception $e) {
-    die("Failed to store tokens: " . $e->getMessage());
+if (!$access_token || !$refresh_token || !$id_token) {
+    exit("Token not received from Azure.");
 }
 
-// Success message
-echo "<h2>Thank you! You have successfully logged in.</h2>";
-echo "<p>User: $username ($email)</p>";
-echo "<h3>Token Response:</h3><pre>";
-print_r($token_response);
-echo "</pre>";
+// ---------- Decode id_token safely ----------
+list(, $payload, ) = explode('.', $id_token);
+
+// Add padding for base64url decoding if needed
+$payload .= str_repeat('=', 3 - (strlen($payload) + 3) % 4);
+$user_info = json_decode(base64_decode(strtr($payload, '-_', '+/')), true);
+
+$oid = $user_info['oid'] ?? null;
+$email = $user_info['preferred_username'] ?? null;
+
+if (!$oid || !$email) {
+    exit("Could not retrieve user info from token.");
+}
+
+// ---------- Store tokens in DB ----------
+try {
+    $stmt = $pdo->prepare("
+        INSERT INTO oauth_users (user_email, oid, access_token, refresh_token)
+        VALUES (:email, :oid, :access_token, :refresh_token)
+        ON CONFLICT (oid)
+        DO UPDATE SET access_token = EXCLUDED.access_token,
+                      refresh_token = EXCLUDED.refresh_token,
+                      updated_at = NOW()
+    ");
+
+    $stmt->execute([
+        ':email' => $email,
+        ':oid' => $oid,
+        ':access_token' => $access_token,
+        ':refresh_token' => $refresh_token
+    ]);
+} catch (PDOException $e) {
+    exit("Database error: " . $e->getMessage());
+}
+
+// ---------- Success message ----------
+echo "<h2>Thank you! Access granted.</h2>";
