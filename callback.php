@@ -31,13 +31,25 @@ if (isset($_GET['code'])) {
     ];
 
     $context = stream_context_create($options);
-    $result = @file_get_contents($token_url, false, $context);
+    $ch = curl_init($token_url);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    "Content-Type: application/x-www-form-urlencoded"
+]);
+$result = curl_exec($ch);
 
-    if ($result === FALSE) {
-        error_log("Token request failed: " . print_r($http_response_header, true));
-        echo "Sorry, something went wrong. Please try again later.";
-        exit;
-    }
+if (curl_errno($ch)) {
+    die("cURL error: " . curl_error($ch));
+}
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+
+if ($httpCode != 200) {
+    die("Token request failed with HTTP code $httpCode. Check your client ID, secret, and redirect URI.");
+}
+   
 
     $token_response = json_decode($result, true);
 
