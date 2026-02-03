@@ -1,6 +1,4 @@
 <?php
-// Start session
-session_start();
 
 // Render Postgres DB credentials
 $host = 'dpg-d5vv58soud1c738tk8sg-a.virginia-postgres.render.com';
