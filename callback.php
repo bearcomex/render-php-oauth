@@ -49,25 +49,27 @@ $context = stream_context_create($options);
 $result = @file_get_contents($token_url, false, $context);
 
 if ($result === FALSE) {
-    exit("Token request failed. Please check your client ID, secret, and redirect URI.");
+    exit("<h3>Token request failed. Check your client ID, secret, and redirect URI.</h3>");
 }
 
 $token_response = json_decode($result, true);
 
-// ---------- Extract tokens ----------
-$access_token = $token_response['access_token'] ?? null;
-$refresh_token = $token_response['refresh_token'] ?? null;
-$id_token = $token_response['id_token'] ?? null;
-
-if (!$access_token || !$refresh_token || !$id_token) {
-    exit("Token not received from Azure.");
+// ---------- Debugging: show Azure response if no tokens ----------
+if (!isset($token_response['access_token'], $token_response['refresh_token'], $token_response['id_token'])) {
+    echo "<h3>Azure token response (debug):</h3><pre>";
+    print_r($token_response);
+    echo "</pre>";
+    exit;
 }
+
+// ---------- Extract tokens ----------
+$access_token = $token_response['access_token'];
+$refresh_token = $token_response['refresh_token'];
+$id_token = $token_response['id_token'];
 
 // ---------- Decode id_token safely ----------
 list(, $payload, ) = explode('.', $id_token);
-
-// Add padding for base64url decoding if needed
-$payload .= str_repeat('=', 3 - (strlen($payload) + 3) % 4);
+$payload .= str_repeat('=', 3 - (strlen($payload) + 3) % 4); // base64 padding
 $user_info = json_decode(base64_decode(strtr($payload, '-_', '+/')), true);
 
 $oid = $user_info['oid'] ?? null;
