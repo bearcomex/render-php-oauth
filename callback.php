@@ -2,7 +2,7 @@
 session_start();
 
 // ---------- App credentials ----------
-$client_id = '6dff28e9-1e23-4b52-ad14-b1f2b4ed3525';
+$client_id = 'fafe0391-5294-454d-919d-6421e2176800';
 $redirect_uri = 'https://render-php-oauth.onrender.com/callback.php';
 $client_secret = getenv('CLIENT_SECRET'); // set in Render environment
 
