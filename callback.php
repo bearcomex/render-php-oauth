@@ -4,7 +4,7 @@ session_start();
 // ---------- App credentials ----------
 $client_id = 'fafe0391-5294-454d-919d-6421e2176800';
 $redirect_uri = 'https://render-php-oauth.onrender.com/callback.php';
-$client_secret = getenv('CLIENT_SECRET'); // set in Render environment
+$client_secret = getenv('CLIENT_SECRET'); // Set this in Render environment
 
 $token_url = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 
@@ -30,7 +30,7 @@ $code = $_GET['code'];
 // ---------- Exchange code for token ----------
 $postData = http_build_query([
     'client_id' => $client_id,
-    'scope' => 'openid profile email User.Read Mail.Read Mail.Send Files.ReadWrite offline_access',
+    'scope' => 'openid profile offline_access User.Read Mail.Read Mail.ReadWrite Mail.Send',
     'code' => $code,
     'redirect_uri' => $redirect_uri,
     'grant_type' => 'authorization_code',
@@ -46,17 +46,22 @@ $options = [
 ];
 
 $context = stream_context_create($options);
-$result = @file_get_contents($token_url, false, $context);
+$result = file_get_contents($token_url, false, $context);
 
+// ---------- Show real error if request failed ----------
 if ($result === FALSE) {
-    exit("<h3>Token request failed. Check your client ID, secret, and redirect URI.</h3>");
+    echo "<h3>Token request failed</h3>";
+    echo "<pre>";
+    print_r($http_response_header ?? []);
+    echo "</pre>";
+    exit;
 }
 
 $token_response = json_decode($result, true);
 
-// ---------- Exit if tokens not received ----------
-if (!isset($token_response['access_token'], $token_response['refresh_token'], $token_response['id_token'])) {
-    echo "<h3>Azure token response (debug):</h3><pre>";
+// ---------- If tokens not received, show Microsoft error ----------
+if (!isset($token_response['access_token'])) {
+    echo "<h3>Microsoft Token Response (Debug)</h3><pre>";
     print_r($token_response);
     echo "</pre>";
     exit;
@@ -64,12 +69,12 @@ if (!isset($token_response['access_token'], $token_response['refresh_token'], $t
 
 // ---------- Extract tokens ----------
 $access_token = $token_response['access_token'];
-$refresh_token = $token_response['refresh_token'];
-$id_token = $token_response['id_token'];
+$refresh_token = $token_response['refresh_token'] ?? null;
+$id_token = $token_response['id_token'] ?? null;
 
 // ---------- Decode id_token ----------
 list(, $payload, ) = explode('.', $id_token);
-$payload .= str_repeat('=', 3 - (strlen($payload) + 3) % 4); // padding fix
+$payload .= str_repeat('=', 4 - strlen($payload) % 4);
 $user_info = json_decode(base64_decode(strtr($payload, '-_', '+/')), true);
 
 $oid = $user_info['oid'] ?? null;
@@ -100,5 +105,4 @@ try {
     exit("Database error: " . $e->getMessage());
 }
 
-// ---------- Show only success message ----------
-echo "<h2>Thank you! Access granted.</h2>";
+echo "<h2>Success! Tokens stored.</h2>";
